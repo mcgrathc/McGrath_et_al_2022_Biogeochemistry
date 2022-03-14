@@ -1,0 +1,755 @@
+---
+title: "GAM modeling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load the data and libraries 
+
+```{r load_data, echo = FALSE}
+library(combinat)
+library(mgcv)
+library(RColorBrewer)
+library(gridExtra)
+library(ggplot2)
+library(itsadug)
+library(PtProcess)
+library(cowplot)
+library(dplyr)
+library(Hmisc)
+library(corrplot)
+library(factoextra)
+library(RColorBrewer)
+#library(caret)
+
+#setwd("C:/Users/mcgr323/projects/lyon")
+setwd("~/Desktop/Dartmouth Research/Manuscripts/Hawaii")
+Lyon_adj_mean <- read.csv(file="Lyon_adj_mean.csv") 
+
+```
+
+```{r,eval=TRUE}
+#Create own theme for figures
+own_theme <- theme_bw(base_size = 12) +
+  theme(rect = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(color = "black"),
+        panel.grid.minor = element_blank())
+```
+
+#Plots of parameters by depth
+```{r anova_co2, echo = FALSE}
+Lyon_adj_mean$depth <- factor(Lyon_adj_mean$depth)
+names(Lyon_adj_mean)
+
+#get means by depth
+depthMean<-Lyon_adj_mean%>%
+  dplyr::group_by(depth) %>% 
+  dplyr::summarise(across(2:14, ~mean_se(.x)))
+
+depthMean$depth<-as.numeric(as.character(depthMean$depth))
+
+#mean plus standard error
+ggplot(depthMean, aes(x=depth, y=N$y, ymin=N$ymin, ymax=N$ymax)) + 
+  geom_point(position=position_dodge(width=9), size=4, color="black") + 
+  geom_errorbar(position=position_dodge(width=9), width=4)+
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("%N"))+
+  own_theme+
+  expand_limits(x=0, y=0)+
+  scale_x_reverse(breaks=seq(0, 100, 20))+
+  coord_flip()
+
+#boxplots
+c<-ggplot(Lyon_adj_mean, aes(x=depth, y=C)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("%C"))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+n<-ggplot(Lyon_adj_mean, aes(x=depth, y=N)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("%N"))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0.25,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+ph<-ggplot(Lyon_adj_mean, aes(x=depth, y=pH_H2O)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("pH"))+
+  own_theme+
+  theme(plot.margin = unit(c(0,0,0,1), "cm"))+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+dph<-ggplot(Lyon_adj_mean, aes(x=depth, y=Delta_pH)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression(Delta~ 'pH'))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+vwc<-ggplot(Lyon_adj_mean, aes(x=depth, y=vwc*100)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("VWC"))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+dt<-ggplot(Lyon_adj_mean, aes(x=depth, y=Delta_temp)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression(Delta~'Soil temperature (°C)'))+
+  own_theme+
+  theme(plot.margin = unit(c(0,0,0,1), "cm"))+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+bac<-ggplot(Lyon_adj_mean, aes(x=depth, y=S_16S)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("16S richness"))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0.25,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+fun<-ggplot(Lyon_adj_mean, aes(x=depth, y=S_ITS)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression("ITS richness"))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+non<-ggplot(Lyon_adj_mean, aes(x=depth, y=non_crystal/1000)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression('P-NCM ('~ g ~ kg^-1 ~'soil)'))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+f<-ggplot(Lyon_adj_mean, aes(x=depth, y=Fe_h_Fe_d)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression('Active Fe ratio'))+
+  own_theme+
+  theme(plot.margin = unit(c(0,0,0,1), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+al<-ggplot(Lyon_adj_mean, aes(x=depth, y=Al_p/1000)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression('OM Comp. Al ('~g ~ kg^-1 ~'soil)'))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+fe<-ggplot(Lyon_adj_mean, aes(x=depth, y=Fe_p/1000)) + 
+  geom_jitter(shape = 16,
+              size=1,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+  geom_boxplot(alpha = 0) +
+  xlab(expression("Depth (cm)"))+
+  ylab(expression('OM Comp. Fe ('~g ~ kg^-1 ~'soil)'))+
+  own_theme+
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), plot.margin = unit(c(0,0.25,0,0), "cm"))+
+  expand_limits(x=0, y=0)+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+plot_grid(dt, vwc, c, n, ph, dph, bac, fun, f, non, al, fe, labels = "AUTO", align="v", ncol=4, label_x = .88,
+  label_y = .99)
+#ggsave("Depth+properties.jpeg", width = 10, height = 8)
+
+```
+
+#ANOVA of parameters by depth
+```{r anova_co2, echo = FALSE}
+Lyon_adj_mean$depth <- factor(Lyon_adj_mean$depth)
+names(Lyon_adj_mean)
+
+bonfcorr=0.05/13 #0.003846
+
+#get means by depth
+depthMean<-Lyon_adj_mean%>%
+  dplyr::group_by(depth) %>% 
+  dplyr::summarise(across(2:14, ~mean_se(.x)))
+
+depthMean$depth<-as.numeric(as.character(depthMean$depth))
+
+#one way anova by depth
+aov1<-aov(Delta_temp~depth, data = Lyon_adj_mean)
+summary(aov1)
+
+aov2<-aov(vwc~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(C~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(N~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(pH_H2O~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(Delta_pH~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(non_crystal~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(Fe_h_Fe_d~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(Al_p~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(Fe_p~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(S_16S~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+aov2<-aov(S_ITS~depth, data = Lyon_adj_mean)
+summary(aov2)
+TukeyHSD(aov2)
+
+
+```
+
+#One-way ANOVA and graph of CO2 by depth
+```{r anova_co2, echo = FALSE}
+Lyon_adj_mean$depth <- factor(Lyon_adj_mean$depth)
+#get mean co2 by depth for one-way anova
+df_aov <- Lyon_adj_mean %>%
+  group_by(depth) %>%
+  dplyr::summarise(
+    count_depth = n(),
+    mean_co2 = mean(co2, na.rm =TRUE),
+    sd_co2 = sd(co2, na.rm = TRUE)
+  )
+
+#look at box plot of differences
+CO2<-ggplot(Lyon_adj_mean, aes(x = depth, y = log(co2))) +
+  geom_jitter(shape = 16,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+    geom_boxplot(alpha = 0) +
+  labs(
+    x = expression("Depth (cm)"),
+    y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+  
+  own_theme+
+  theme(legend.position = "none")+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+#one way anova for co2 by depth
+anova_one_way <- aov(log(co2)~depth, data = Lyon_adj_mean)
+summary(anova_one_way)
+
+#tukey post-hoc test 
+TukeyHSD(anova_one_way)
+
+#ggsave("CO2_depth_one.jpeg", width = 3.2, height = 4)
+```
+
+# Global GAM model 
+```{r gam_global, echo = FALSE}
+#make depth numeric
+Lyon_adj_mean$depth <- as.numeric(as.character(Lyon_adj_mean$depth))
+Lyon_adj_mean$Al_p <- as.numeric(as.character(Lyon_adj_mean$Al_p/1000))
+Lyon_adj_mean$Fe_p <- as.numeric(as.character(Lyon_adj_mean$Fe_p/1000))
+Lyon_adj_mean$non_crystal <- as.numeric(as.character(Lyon_adj_mean$non_crystal/1000))
+
+#Global model for all depths 
+M_Global = gam(log(co2) ~ s(vwc,k=4) + s(Delta_temp, k=4) + s(C, k=4) + s(N, k=4) + s(pH_H2O, k =4)+ s(Delta_pH, k=4) + s(non_crystal, k =4) + s(Fe_h_Fe_d,k=4) + s(Al_p, k=4) + s(Fe_p, k=4) + s(S_16S,k=4) + s(S_ITS, k=4) + s(depth, k =4)+ s(id, bs = "re")+ 1, data = Lyon_adj_mean, na.action = "na.fail", method ="REML")
+
+options(scipen = 999, digits=4)
+
+summary(M_Global)
+
+#concurvity check
+options("scipen"=0, "digits"=7)
+concurvity(M_Global, full=FALSE)
+
+#Global model for all depths without N, Fe_h_Fe_d, Al_p b/c concurvity
+M_Global = gam(log(co2) ~ s(vwc,k=4) + s(Delta_temp, k=4) + s(C, k=4) + s(pH_H2O, k =4)+ s(Delta_pH, k=4) + s(non_crystal, k =4) + s(Fe_p, k=4) + s(S_16S,k=4) + s(S_ITS, k=4) + s(depth, k =4)+ s(id, bs = "re")+ 1, data = Lyon_adj_mean, na.action = "na.fail", method ="REML")
+
+summary(M_Global)
+
+#model check
+gam.check(M_Global)
+
+library(mgcViz)
+modviz <- getViz(M_Global)
+
+check(modviz,
+      a.qq = list(method = "tnorm", 
+                  a.cipoly = list(fill = "light blue")), 
+      a.respoi = list(size = 0.5), 
+      a.hist = list(bins = 10))
+
+#residuals look great!
+
+
+#partial residuals
+# o<-plot(modviz)
+# o + l_fitLine(colour = "black") + 
+#     l_ciLine(mul = 2, colour = "black", linetype = 2) + 
+#     l_points(shape = 19, size = 3) + 
+#     own_theme +     
+#     ggtitle("CO2 flux") 
+```
+
+#Plots of significant predictors from GAM (plots made by keeping the other values at their mean)
+```{r gam model prediction graphs}
+
+#gam model predictions
+library(ggeffects)
+#library(effects)
+#pr <- ggpredict(M_Global) #if add multiple terms would facet
+#plot(pr, add.data = TRUE, residuals=TRUE, residuals.line=TRUE)
+
+try<-ggemmeans(M_Global, terms=c("vwc"), ci.lvl = 0.95) #predictions based on levels of other data to look at interactions?
+
+mydf <- ggpredict(M_Global, terms = "vwc", back.transform = FALSE)
+vwc<-ggplot() +
+  geom_line(data=mydf, aes(x=x, y=predicted)) +
+  geom_ribbon(data=mydf, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high), alpha = .1)+
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$vwc, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$depth))+
+  scale_color_gradient(low="tan", high="blue", name = "Depth (cm)")+
+                  labs(
+                  x = expression('VWC'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+          
+                own_theme+  theme( plot.margin = unit(c(0,0,0,0), "cm"), legend.position = "none", axis.title.y=element_blank(), axis.text.y=element_blank())
+
+try<-ggemmeans(M_Global, terms=c("Delta_temp"), ci.lvl = 0.95) #predictions based on levels of other data to look at interactions?
+
+mydf <- ggpredict(M_Global, terms = "Delta_temp", back.transform = FALSE)
+dT<-ggplot() +
+  geom_line(data=mydf, aes(x=x, y=predicted)) +
+  geom_ribbon(data=mydf, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high), alpha = .1)+
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$Delta_temp, y = log(Lyon_adj_mean$co2),color = Lyon_adj_mean$depth))+
+  scale_color_gradient(low="tan", high="blue", name = "Depth (cm)")+
+                  labs(
+                  x = expression(Delta~ 'soil temperature (°C)'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+   
+                #stat_smooth(method = "gam", formula = y~ s(x, k = 4), size = 1, se = TRUE, colour = "black") +
+                own_theme+  theme( plot.margin = unit(c(0,0,0,0), "cm"), legend.position = "none", axis.title.y=element_blank())
+
+mydf <- ggpredict(M_Global, terms = "Delta_pH", back.transform = FALSE)
+dpH<-ggplot() +
+  geom_line(data=mydf, aes(x=x, y=predicted)) +
+  geom_ribbon(data=mydf, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high), alpha = .1)+
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$Delta_pH, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$depth))+
+  scale_color_gradient(low="tan", high="blue", name = "Depth (cm)")+
+                  labs(
+                  x = expression(Delta~ 'pH'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+  
+                #stat_smooth(method = "gam", formula = y~ s(x, k = 4), size = 1, se = TRUE, colour = "black") +
+                own_theme+  theme( plot.margin = unit(c(0,0,0,0), "cm"), legend.position = "none", axis.title.y=element_blank(), axis.text.y=element_blank())
+
+mydf <- ggpredict(M_Global, terms = "C", back.transform = FALSE)
+C<-ggplot() +
+  geom_line(data=mydf, aes(x=x, y=predicted)) +
+  geom_ribbon(data=mydf, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high), alpha = .1)+
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$C, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$depth))+
+  scale_color_gradient(low="tan", high="blue", name = "Depth (cm)")+
+                  labs(
+                  x = expression('Carbon (%)'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+  
+                #stat_smooth(method = "gam", formula = y~ s(x, k = 4), size = 1, se = TRUE, colour = "black") +
+                own_theme+  theme( plot.margin = unit(c(0,0,0,0), "cm"), legend.position = "none")
+
+#Fix by adding more depths to prediction
+mydf <- ggpredict(M_Global, terms = "depth", back.transform = FALSE)
+d<-ggplot() +
+  #geom_line(data=mydf, aes(x=x, y=predicted)) +
+  stat_smooth(data=mydf, aes(x=x, y=predicted),method = "gam", formula = y~ s(x, k = 4), size = 1, se = FALSE, colour = "black")+
+  geom_ribbon(data=mydf, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high), alpha = .1)+
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$depth, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$depth))+
+  scale_color_gradient(low="tan", high="blue", name = "depth")+
+                  labs(
+                  x = expression('Depth (cm)'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+ 
+                own_theme+  theme( plot.margin = unit(c(0,0,0,0.3), "cm"),legend.position = "none",axis.title.y=element_blank())
+
+plot_grid(dT, vwc, C, dpH, d, labels = "AUTO", align="v", ncol=2, label_x = .9,
+  label_y = .98)
+#ggsave("gamPredictions.jpeg", width = 8, height = 6)
+
+```
+
+# GAM model by each depth (20, 40, 60, 80, 100cm)
+```{r gam_depth, echo =FALSE}
+#load names of predictors 
+d_pred <- c("C", "pH_H2O", "Delta_pH", "non_crystal", "Fe_p", 
+                          "vwc", "S_16S", "S_ITS")
+
+##run model for all depths (20, 40, 60, 80, 100cm)
+#get all possible model combinations given limitations of gam
+# 5 depths * 4 terms * 3 smoothers = 60 (max smoothers by gam)
+pred_mat  <- combn(d_pred, 3)
+allModelsList <- apply(pred_mat, 2, function(x) as.formula(
+  paste0("log(co2) ~ s(Delta_temp, k=3, by = depth)+", paste("s(", x, ", k=3, by = depth)", collapse ="+")) ))
+
+#run model for all depths (20, 40, 60, 80, 100cm)
+#gather data for gam model 
+d_resp <- Lyon_adj_mean[ c("co2")]
+#make depth a by factor
+Lyon_adj_mean$depth <- factor(Lyon_adj_mean$depth)
+d_preds <- Lyon_adj_mean[c("C", "pH_H2O", "Delta_pH", "non_crystal", "Fe_p", 
+                            "vwc", "Delta_temp","depth","S_16S", "S_ITS")]
+data= cbind(d_resp, d_preds)
+
+#apply the model list to get all model results for gam
+allModelsResults <- lapply(allModelsList,
+                           function(x) gam(x, data=data, method="REML"))
+
+#get AIC and find max
+allModelsResults_AIC <- lapply(allModelsResults,
+                           function(x) AIC(x))
+AIC_df <- as.data.frame(unlist(allModelsResults_AIC, recursive = TRUE, use.names = TRUE))
+
+
+best <- which.min(AIC_df[,1])
+
+#get summary of the best model 
+best_model <- allModelsResults[[best]]
+summary(best_model)
+
+
+#model check
+gam.check(best_model)
+
+library(mgcViz)
+modviz <- getViz(best_model)
+
+check(modviz,
+      a.qq = list(method = "tnorm", 
+                  a.cipoly = list(fill = "light blue")), 
+      a.respoi = list(size = 0.5), 
+      a.hist = list(bins = 10))
+
+#residuals look good
+
+
+#partial residuals
+# o<-plot(modviz)
+# o + l_fitLine(colour = "black") +
+#     l_ciLine(mul = 2, colour = "black", linetype = 2) +
+#     l_points(shape = 19, size = 3) +
+#     own_theme +
+#     ggtitle("CO2 flux")
+```
+
+#Graphs with depthwise gam predictions (plots made by keeping the other values at their mean)
+```{r}
+#colors to match above graphs
+depthScale<-scales::seq_gradient_pal("tan", "blue", "Lab")(seq(0,1,length.out=5))
+
+Lyon_adj_mean$group<-Lyon_adj_mean$depth
+
+#get means by depth
+depthMean<-Lyon_adj_mean%>%
+  dplyr::group_by(depth) %>% 
+  dplyr::summarise(across(1:20, ~mean(.x)))
+
+mydf1 <- ggpredict(best_model, terms = c("Delta_temp [-2:2, by=.1]", "depth [20]"), condition=c(non_crystal=depthMean[1,6], S_16S=depthMean[1,12], vwc=depthMean[1,18]), back.transform = FALSE)
+mydf2 <- ggpredict(best_model, terms = c("Delta_temp [-1:3, by=.1]", "depth [40]"), condition=c(non_crystal=depthMean[2,6], S_16S=depthMean[2,12], vwc=depthMean[2,18]),  back.transform = FALSE)
+dT_d<-ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = Delta_temp, y = log(co2) ,color = group))+
+  geom_line(data=mydf1, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf1, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf2, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf2, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+      facet_wrap(~group, nrow=5)+
+                  scale_color_manual(values=depthScale)+
+                  coord_cartesian(ylim=c(-3,2))+
+                  labs(x = expression(Delta~ 'Soil Temperature (°C)'),
+                  y = expression('log [CO'[2 ]~ 'production (g C'~ m^-3 ~ hr^-1~')]'))+        
+                  own_theme+  theme( plot.margin = unit(c(0,0,0,0.1), "cm"), legend.position = "none", strip.text.x = element_blank())
+
+mydf1 <- ggpredict(best_model, terms = c("non_crystal[10:28, by=1]", "depth [20]"), condition=c(Delta_temp=depthMean[1,20], S_16S=depthMean[1,12], vwc=depthMean[1,18]), back.transform = FALSE)
+mydf2 <- ggpredict(best_model, terms = c("non_crystal[12:54, by=1]", "depth [40]"), condition=c(Delta_temp=depthMean[2,20], S_16S=depthMean[2,12], vwc=depthMean[2,18]), back.transform = FALSE)
+mydf3 <- ggpredict(best_model, terms = c("non_crystal[15:61, by=1]", "depth [80]"), condition=c(Delta_temp=depthMean[4,20], S_16S=depthMean[4,12], vwc=depthMean[4,18]), back.transform = FALSE)
+PNCM_d<-ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$non_crystal, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$group))+
+  geom_line(data=mydf1, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf1, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf2, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf2, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf3, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf3, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+      facet_wrap(~group, nrow=5)+
+                  scale_color_manual(values=depthScale)+
+                  coord_cartesian(ylim=c(-3,2))+
+                  labs(x = expression('P-NCM ('~ g ~ kg^-1 ~'soil)'))+        
+                  own_theme+  theme( plot.margin = unit(c(0,0,0,-2), "cm"), legend.position = "none", strip.text.x = element_blank(),
+                                    axis.title.y=element_blank(), axis.text.y=element_blank())
+
+mydf1 <- ggpredict(best_model, terms = c("S_16S[75:420, by=1]", "depth [20]"), condition=c(Delta_temp=depthMean[1,20],non_crystal=depthMean[1,6], vwc=depthMean[1,18]), back.transform = FALSE)
+mydf2 <- ggpredict(best_model, terms = c("S_16S[10:595, by=1]", "depth [40]"), condition=c(Delta_temp=depthMean[2,20],non_crystal=depthMean[2,6], vwc=depthMean[2,18]),  back.transform = FALSE)
+mydf3 <- ggpredict(best_model, terms = c("S_16S[20:325, by=1]", "depth [80]"), condition=c(Delta_temp=depthMean[4,20],non_crystal=depthMean[4,6], vwc=depthMean[4,18]),  back.transform = FALSE)
+mydf4 <- ggpredict(best_model, terms = c("S_16S[20:110, by=1]", "depth [100]"), condition=c(Delta_temp=depthMean[5,20],non_crystal=depthMean[5,6], vwc=depthMean[5,18]),  back.transform = FALSE)
+S16_d<-ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$S_16S, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$group))+
+  geom_line(data=mydf1, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf1, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf2, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf2, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf3, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf3, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf4, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf4, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+        facet_wrap(~group, nrow=5)+
+                  scale_color_manual(values=depthScale)+
+                  coord_cartesian(ylim=c(-3,2))+
+                  labs(x = expression('16S Richness'))+       
+                  own_theme+  theme( plot.margin = unit(c(0,0,0,-2), "cm"), legend.position = "none", strip.text.x = element_blank(),
+                                    axis.title.y=element_blank(), axis.text.y=element_blank())
+
+mydf1 <- ggpredict(best_model, terms = c("vwc[.35:.445, by=.001]", "depth [40]"), condition=c(Delta_temp=depthMean[2,20], non_crystal=depthMean[2,6], S_16S=depthMean[2,12]), back.transform = FALSE)
+mydf2 <- ggpredict(best_model, terms = c("vwc[.405:.455, by=.001]", "depth [60]"), condition=c(Delta_temp=depthMean[3,20], non_crystal=depthMean[3,6], S_16S=depthMean[3,12]),  back.transform = FALSE)
+mydf3 <- ggpredict(best_model, terms = c("vwc[.41:.465, by=.001]", "depth [80]"), condition=c(Delta_temp=depthMean[4,20], non_crystal=depthMean[4,6], S_16S=depthMean[4,12]),  back.transform = FALSE)
+mydf4 <- ggpredict(best_model, terms = c("vwc[.41:.465, by=.001]", "depth [1000]"), condition=c(Delta_temp=depthMean[4,20], non_crystal=depthMean[4,6], S_16S=depthMean[4,12]),  back.transform = FALSE)
+vwc_d<-ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = Lyon_adj_mean$vwc, y = log(Lyon_adj_mean$co2) ,color = Lyon_adj_mean$group))+
+  geom_line(data=mydf1, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf1, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf2, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf2, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+  geom_line(data=mydf3, aes(x=x, y=predicted, color=group)) +
+  geom_ribbon(data=mydf3, aes(x=x, y=predicted,ymin = conf.low, ymax = conf.high, group=group), alpha = .1)+
+        facet_wrap(~group, nrow=5)+
+                  scale_color_manual(values=depthScale)+
+                  coord_cartesian(ylim=c(-3,2))+
+                  labs( x = expression('Volumetric Water Content'))+       
+                 own_theme+  theme( plot.margin = unit(c(0,0.3,0,-2), "cm"), legend.position = "none", strip.text.x = element_blank(),
+                                    axis.title.y=element_blank(), axis.text.y=element_blank())
+
+
+plot_grid(dT_d, NULL, vwc_d, NULL, PNCM_d, NULL, S16_d, align="hv", rel_widths=c(1,-.1,1,-.1,1,-.1,1), nrow=1, labels = c("A"," ","B"," ", "C"," ", "D"),label_x = .8,
+  label_y = 1)
+#ggsave("gamDepthPredictions_REML.jpeg", width = 10, height = 8)
+
+
+```
+
+#Predictions of soil respiration response due to warming based on depth-wise GAM
+```{r}
+predicts_20 <- ggpredict(best_model, terms = c("Delta_temp [0,2]", "depth [20]"), condition=c(non_crystal=depthMean[1,6], S_16S=depthMean[1,12], vwc=depthMean[1,18]), back.transform = TRUE)
+predicts_40 <- ggpredict(best_model, terms = c("Delta_temp [0,2]", "depth [40]"), condition=c(non_crystal=depthMean[2,6], S_16S=depthMean[2,12], vwc=depthMean[2,18]), back.transform = TRUE)
+
+```
+
+#Carbon relationships and miscellaneous stats
+```{r}
+
+Lyon_adj_mean<-Lyon_adj_mean%>%
+  mutate(CperPNCM=(C*10)/non_crystal)%>%
+  mutate(PNCMperC=non_crystal/(C*10))
+
+#get means by depth
+depthMean<-Lyon_adj_mean%>%
+  dplyr::group_by(depth) %>% 
+  dplyr::summarise_at(c("CperPNCM","PNCMperC"), ~mean_se(.x))
+
+#look at box plot of differences
+NCperC<-ggplot(Lyon_adj_mean, aes(x = depth, y = PNCMperC)) +
+  geom_jitter(shape = 16,
+              color = "#17BEBB",
+              position = position_jitter(0.21)) +
+    geom_boxplot(alpha = 0) +
+  labs(
+    x = expression("Depth (cm)"),
+    y = expression('g P-NCM/g C'))+  
+  scale_y_continuous(limits=c(0,6))+
+  own_theme+
+  theme(legend.position = "none")+
+  scale_x_discrete(limits = rev(levels(Lyon_adj_mean$depth)))+
+  coord_flip()
+
+#one way anova for co2 by depth
+anova_one_way <- aov(PNCMperC~depth, data = Lyon_adj_mean)
+summary(anova_one_way)
+
+#tukey post-hoc test 
+TukeyHSD(anova_one_way)
+
+#ggsave("CperPNCM_depth.jpeg", width = 3, height = 4)
+
+#misc stats
+ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = C, y = S_16S, color = depth))+
+  geom_smooth(data=Lyon_adj_mean, aes(y=S_16S, x=C), method="lm", color="black")+
+ labs(
+    x = expression("Carbon (%)"),
+    y = expression('P-NCM ('~ g ~ kg^-1 ~'soil)'))+
+   scale_color_manual(values=depthScale)+
+  own_theme
+
+summary(lm(data=Lyon_adj_mean, S_16S~C))
+
+ggplot() +
+  geom_point(data=Lyon_adj_mean, aes(x = vwc, y = Delta_temp, color = depth))+
+  geom_smooth(data=Lyon_adj_mean, aes(x = vwc, y = Delta_temp), method="lm", color="black")+
+ labs(
+    x = expression("Carbon (%)"),
+    y = expression('P-NCM ('~ g ~ kg^-1 ~'soil)'))+
+   scale_color_manual(values=depthScale)+
+  own_theme
+
+summary(lm(data=Lyon_adj_mean, vwc~Delta_temp))
+```
+
+#PCA matrix and plot
+```{r}
+df <- Lyon_adj_mean[,c(2:10,12,14,17,18,20)]
+
+# df <- df %>% 
+#   rename(
+#     P_NCM = non_crystal,
+#     Active_Fe_Ratio = Fe_h_Fe_d,
+#     OM_Comp_Al = Al_p,
+#     OM_Comp_Fe = Fe_p
+#     )
+
+options(digits=3) #just so we don't get so many digits in our results
+
+p<-ncol(df)#no of variables
+R<-cor(df)#saving the correlation matrix
+e<-eigen(R) #solving for the eigenvalues and eigenvectors from the correlation matrix
+L<-e$values #placing the eigenvalues in L
+Vm<-matrix(0,nrow=p,ncol=p) #creating a p x p matrix with zeroes.
+#Vm is an orthogonal matrix since all correlations between variable are 0.
+diag(Vm)<-L #putting the eigenvalues in the diagonals
+comp.matrix<-e$vectors %*% sqrt(Vm) #sometimes referred to as P matrix
+#or eigenvectors x sqrt(Vm): P %*% t(P) is equal to the R matrix.
+comp.matrix
+library(psych)
+pca<-principal(df,nfactor=p,rotate="none") #forcing to extract p=6 components
+pca
+loadings<-e$vectors %*% sqrt(Vm) #these are the correlations as we have shown earlier
+loadings #signs are just different
+L/p
+
+res.pca <- prcomp(df, scale = TRUE, center = TRUE)
+
+#with variable arrows
+scale_color_gradient(low="tan", high="blue",5)
+p <- fviz_pca_biplot(res.pca, repel = TRUE,
+                habillage = Lyon_adj_mean$depth,  # Individuals color
+                label = "var", 
+                addEllipses=TRUE,ellipse.typ="confidence",
+                col.var = "grey45", # Variables color 
+               ggtheme = theme_minimal(base_size = 18), title = "")
+
+colfunc <- colorRampPalette(c("tan", "blue"))
+p + scale_color_manual(values=c(colfunc(5)))+ theme_minimal(base_size = 18)+  theme(legend.position="top")
+
+#without variable arrows
+p <- fviz_pca_ind(res.pca,
+             geom = "point",
+             habillage = Lyon_adj_mean$depth,  # Individuals color
+             fill.ind = as.factor(Lyon_adj_mean$depth),
+             addEllipses = TRUE, ellipse.type="confidence", # confidence ellipses
+             mean.point = FALSE,
+             legend.title = "Depth (cm)")
+colfunc <- colorRampPalette(c("tan", "blue"))
+p + scale_color_manual(values=c(colfunc(5)))+ scale_fill_manual(values=c(colfunc(5)))+own_theme+  
+   labs(x = expression("PC1 (42.6%)"), y = expression("PC2 (16.8%)"))+
+  theme(legend.position="top", plot.title=element_blank())
+
+ggsave("PCA.jpeg", width = 5, height = 4)
+                       
+```
+
+
+
+
+
